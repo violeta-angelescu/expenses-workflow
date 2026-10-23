@@ -1,48 +1,29 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-/**
- * Debounced search box. Emits onSearch only after the user pauses typing,
- * skips the initial mount, and never re-fires for an unchanged trimmed value.
- */
+/** Debounced search box: calls onSearch once the user pauses typing. */
 export function SearchInput({
   onSearch,
-  delay = 300,
   placeholder = "Search…",
 }: {
   onSearch: (query: string) => void;
-  delay?: number;
   placeholder?: string;
 }) {
   const [value, setValue] = useState("");
-  const last = useRef("");
-  const onSearchRef = useRef(onSearch);
-  onSearchRef.current = onSearch;
 
   useEffect(() => {
-    const trimmed = value.trim();
-    if (trimmed === last.current) return;
-    const t = setTimeout(() => {
-      last.current = trimmed;
-      onSearchRef.current(trimmed);
-    }, delay);
+    const t = setTimeout(() => onSearch(value.trim()), 300);
     return () => clearTimeout(t);
-  }, [value, delay]);
+  }, [value, onSearch]);
 
   return (
-    <div className="form-row">
-      <input
-        type="search"
-        aria-label="Search expenses"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-      />
-      {value && (
-        <button type="button" className="secondary" onClick={() => setValue("")}>
-          Clear
-        </button>
-      )}
-    </div>
+    <input
+      type="search"
+      aria-label="Search expenses"
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      style={{ width: "100%", marginBottom: ".75rem" }}
+    />
   );
 }

@@ -13,6 +13,12 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+const post = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
 export const api = {
   list: (params: { status?: string; q?: string } = {}, signal?: AbortSignal) => {
     const qs = new URLSearchParams();
@@ -21,17 +27,9 @@ export const api = {
     return request<Expense[]>(`/api/expenses?${qs}`, { signal });
   },
   create: (title: string, lineItems: LineItem[]) =>
-    request<Expense>("/api/expenses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, lineItems }),
-    }),
+    request<Expense>("/api/expenses", post({ title, lineItems })),
   transition: (id: string, event: ExpenseEvent, comment?: string) =>
-    request<Expense>(`/api/expenses/${id}/transition`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event, comment }),
-    }),
+    request<Expense>(`/api/expenses/${id}/transition`, post({ event, comment })),
 };
 
 export const money = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });

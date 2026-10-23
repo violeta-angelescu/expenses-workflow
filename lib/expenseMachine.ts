@@ -43,10 +43,6 @@ export class TransitionError extends Error {
   }
 }
 
-export function availableEvents(status: ExpenseStatus): ExpenseEvent[] {
-  return Object.keys(machine[status]) as ExpenseEvent[];
-}
-
 export function canTransition(status: ExpenseStatus, event: ExpenseEvent): boolean {
   return Boolean(machine[status][event]);
 }
