@@ -12,6 +12,8 @@ export default function RequestsPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState("Error");
+  const [canRetryLoad, setCanRetryLoad] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -19,10 +21,13 @@ export default function RequestsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setCanRetryLoad(false);
     try {
       setExpenses(await api.list());
     } catch (e) {
+      setErrorTitle("Unable to load requests");
       setError((e as Error).message);
+      setCanRetryLoad(true);
     } finally {
       setLoading(false);
     }
@@ -33,6 +38,7 @@ export default function RequestsPage() {
   async function create({ title, items }: ExpenseFormData) {
     setSaving(true);
     setError(null);
+    setCanRetryLoad(false);
     try {
       const created = await api.create(
         title,
@@ -41,6 +47,7 @@ export default function RequestsPage() {
       setExpenses((prev) => [created, ...prev]);
       return true;
     } catch (err) {
+      setErrorTitle("Unable to create expense");
       setError((err as Error).message);
       return false;
     } finally {
@@ -51,10 +58,12 @@ export default function RequestsPage() {
   async function submit(id: string) {
     setBusyId(id);
     setError(null);
+    setCanRetryLoad(false);
     try {
       const updated = await api.transition(id, "submit");
       setExpenses((prev) => prev.map((x) => (x.id === id ? updated : x)));
     } catch (err) {
+      setErrorTitle("Unable to submit expense");
       setError((err as Error).message);
     } finally {
       setBusyId(null);
@@ -65,9 +74,9 @@ export default function RequestsPage() {
     <>
       <h1>My Requests</h1>
       {error && (
-        <Alert>
+        <Alert title={errorTitle} onDismiss={() => setError(null)}>
           <span>{error}</span>
-          <button className="secondary" onClick={load}>Retry</button>
+          {canRetryLoad && <button className="secondary" onClick={load}>Retry</button>}
         </Alert>
       )}
 

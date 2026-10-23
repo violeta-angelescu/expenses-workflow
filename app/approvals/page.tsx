@@ -12,6 +12,8 @@ export default function ApprovalsPage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState("Error");
+  const [canRetryLoad, setCanRetryLoad] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
@@ -22,6 +24,7 @@ export default function ApprovalsPage() {
     const ctrl = (controller.current = new AbortController());
     setLoading(true);
     setError(null);
+    setCanRetryLoad(false);
     try {
       const data = await api.list({ status: "submitted", q }, ctrl.signal);
       setExpenses(data);
@@ -29,6 +32,8 @@ export default function ApprovalsPage() {
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setError((e as Error).message);
+      setErrorTitle("Unable to load approval queue");
+      setCanRetryLoad(true);
       setLoading(false);
     }
   }, []);
@@ -41,12 +46,14 @@ export default function ApprovalsPage() {
   async function act(id: string, event: "approve" | "reject", text?: string) {
     setBusyId(id);
     setError(null);
+    setCanRetryLoad(false);
     try {
       await api.transition(id, event, text);
       setExpenses((prev) => prev.filter((x) => x.id !== id));
       setRejectingId(null);
       setComment("");
     } catch (e) {
+      setErrorTitle("Unable to update expense");
       setError((e as Error).message);
     } finally {
       setBusyId(null);
@@ -58,9 +65,9 @@ export default function ApprovalsPage() {
       <h1>Approval Queue</h1>
       <SearchInput onSearch={setQuery} placeholder="Search by title or line item…" />
       {error && (
-        <Alert>
+        <Alert title={errorTitle} onDismiss={() => setError(null)}>
           <span>{error}</span>
-          <button className="secondary" onClick={() => load(query)}>Retry</button>
+          {canRetryLoad && <button className="secondary" onClick={() => load(query)}>Retry</button>}
         </Alert>
       )}
       {loading ? (
