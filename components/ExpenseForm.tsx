@@ -2,6 +2,9 @@
 
 import { useRef, useState } from "react";
 import { ExpenseLineItem } from "./ExpenseLineItem";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export interface ExpenseFormItem {
   description: string;
@@ -73,10 +76,10 @@ export function ExpenseForm({ saving = false, onCreate }: ExpenseFormProps) {
     <form className="card" onSubmit={create}>
       <h2 style={{ marginTop: 0 }}>New expense</h2>
       <div className="form-row">
-        <label className="sr-only" htmlFor="expense-title">
+        <Label className="sr-only" htmlFor="expense-title">
           Title
-        </label>
-        <input
+        </Label>
+        <Input
           id="expense-title"
           placeholder="Title"
           value={title}
@@ -98,15 +101,15 @@ export function ExpenseForm({ saving = false, onCreate }: ExpenseFormProps) {
         />
       ))}
       <div className="row">
-        <button
+        <Button
           type="button"
-          className="secondary"
+          variant="outline"
           onClick={addItem}
           disabled={saving}
         >
           + Line item
-        </button>
-        <button disabled={saving}>{saving ? "Saving…" : "Create draft"}</button>
+        </Button>
+        <Button disabled={saving}>{saving ? "Saving…" : "Create draft"}</Button>
       </div>
     </form>
   );

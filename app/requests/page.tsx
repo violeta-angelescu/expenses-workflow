@@ -5,6 +5,7 @@ import { canTransition } from "@/lib/expenseMachine";
 import type { Expense } from "@/lib/types";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { ExpenseForm, type ExpenseFormData } from "@/components/ExpenseForm";
+import { Alert } from "@/components/Alert";
 import { Spinner } from "@/components/Spinner";
 
 export default function RequestsPage() {
@@ -63,7 +64,12 @@ export default function RequestsPage() {
   return (
     <>
       <h1>My Requests</h1>
-      {error && <div className="error" role="alert">{error}</div>}
+      {error && (
+        <Alert>
+          <span>{error}</span>
+          <button className="secondary" onClick={load}>Retry</button>
+        </Alert>
+      )}
 
       <ExpenseForm saving={saving} onCreate={create} />
 
@@ -82,7 +88,6 @@ export default function RequestsPage() {
           </ExpenseCard>
         ))
       )}
-      {error && !loading && <button className="secondary" onClick={load}>Retry</button>}
     </>
   );
 }

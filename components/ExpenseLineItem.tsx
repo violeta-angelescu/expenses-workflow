@@ -1,6 +1,9 @@
 "use client";
 
 import type { ExpenseFormItem } from "./ExpenseForm";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 interface ExpenseLineItemProps {
   item: ExpenseFormItem;
@@ -23,10 +26,10 @@ export function ExpenseLineItem({
 }: ExpenseLineItemProps) {
   return (
     <div className="form-row">
-      <label className="sr-only" htmlFor={`expense-description-${itemId}`}>
+      <Label className="sr-only" htmlFor={`expense-description-${itemId}`}>
         Description
-      </label>
-      <input
+      </Label>
+      <Input
         id={`expense-description-${itemId}`}
         placeholder="Description"
         value={item.description}
@@ -34,31 +37,32 @@ export function ExpenseLineItem({
         disabled={disabled}
         onChange={(event) => onChange({ description: event.target.value })}
       />
-      <label className="sr-only" htmlFor={`expense-amount-${itemId}`}>
+      <Label className="sr-only" htmlFor={`expense-amount-${itemId}`}>
         Amount
-      </label>
-      <input
+      </Label>
+      <Input
         id={`expense-amount-${itemId}`}
         type="number"
         min="0.01"
         step="0.01"
         placeholder="Amount"
-        style={{ width: 110 }}
+        className="w-[110px]"
         value={item.amount}
         required
         disabled={disabled}
         onChange={(event) => onChange({ amount: event.target.value })}
       />
       {canRemove && (
-        <button
+        <Button
           type="button"
-          className="secondary"
+          variant="outline"
+          size="icon"
           onClick={onRemove}
           disabled={disabled}
           aria-label={`Remove line item ${itemNumber}`}
         >
           ×
-        </button>
+        </Button>
       )}
     </div>
   );

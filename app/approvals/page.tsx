@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import type { Expense } from "@/lib/types";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { SearchInput } from "@/components/SearchInput";
+import { Alert } from "@/components/Alert";
 import { Spinner } from "@/components/Spinner";
 
 export default function ApprovalsPage() {
@@ -57,9 +58,10 @@ export default function ApprovalsPage() {
       <h1>Approval Queue</h1>
       <SearchInput onSearch={setQuery} placeholder="Search by title or line item…" />
       {error && (
-        <div className="error" role="alert">
-          {error} <button className="secondary" onClick={() => load(query)}>Retry</button>
-        </div>
+        <Alert>
+          <span>{error}</span>
+          <button className="secondary" onClick={() => load(query)}>Retry</button>
+        </Alert>
       )}
       {loading ? (
         <Spinner />
