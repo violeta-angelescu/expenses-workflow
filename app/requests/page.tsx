@@ -1,92 +1,103 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { canTransition } from "@/lib/expenseMachine";
-import type { Expense } from "@/lib/types";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { ExpenseForm, type ExpenseFormData } from "@/components/ExpenseForm";
-import { PageErrorAlert, type PageError } from "@/components/PageErrorAlert";
+import { PageErrorAlert } from "@/components/PageErrorAlert";
 import { Spinner } from "@/components/Spinner";
 import { getClientErrorMessage } from "@/lib/clientError";
 
+const expensesKey = ["expenses"] as const;
+
 export default function RequestsPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<PageError | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const [saving, setSaving] = useState(false);
+  const expensesQuery = useQuery({
+    queryKey: expensesKey,
+    queryFn: ({ signal }) => api.list({}, signal),
+  });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setExpenses(await api.list());
-    } catch (e) {
-      const message = getClientErrorMessage(e);
-      if (!message) return;
-      setError({ title: "Unable to load requests", message, canRetry: true });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  async function create({ title, items }: ExpenseFormData) {
-    setSaving(true);
-    setError(null);
-    try {
-      const created = await api.create(
+  const create = useMutation({
+    mutationFn: ({ title, items }: ExpenseFormData) =>
+      api.create(
         title,
-        items.map((i) => ({ description: i.description, amount: Number(i.amount) })),
-      );
-      setExpenses((prev) => [created, ...prev]);
+        items.map((item) => ({ description: item.description, amount: Number(item.amount) })),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: expensesKey });
+    },
+  });
+
+  const submit = useMutation({
+    mutationFn: (id: string) => api.transition(id, "submit"),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: expensesKey });
+    },
+  });
+
+  async function createExpense(data: ExpenseFormData) {
+    try {
+      await create.mutateAsync(data);
       return true;
-    } catch (err) {
-      const message = getClientErrorMessage(err);
-      if (!message) return false;
-      setError({ title: "Unable to create expense", message, canRetry: false });
+    } catch {
       return false;
-    } finally {
-      setSaving(false);
     }
   }
 
-  async function submit(id: string) {
-    setBusyId(id);
-    setError(null);
-    try {
-      const updated = await api.transition(id, "submit");
-      setExpenses((prev) => prev.map((x) => (x.id === id ? updated : x)));
-    } catch (err) {
-      const message = getClientErrorMessage(err);
-      if (!message) return;
-      setError({ title: "Unable to submit expense", message, canRetry: false });
-    } finally {
-      setBusyId(null);
-    }
+  function submitExpense(id: string) {
+    submit.mutate(id);
   }
+
+  const error = create.error
+    ? {
+        title: "Unable to create expense",
+        message: getClientErrorMessage(create.error) ?? "Unable to create expense",
+        canRetry: false,
+      }
+    : submit.error
+      ? {
+          title: "Unable to submit expense",
+          message: getClientErrorMessage(submit.error) ?? "Unable to submit expense",
+          canRetry: false,
+        }
+      : expensesQuery.error
+        ? {
+            title: "Unable to load requests",
+            message: getClientErrorMessage(expensesQuery.error) ?? "Unable to load requests",
+            canRetry: true,
+          }
+        : null;
 
   return (
     <>
       <h1>My Requests</h1>
       {error && (
-        <PageErrorAlert error={error} onDismiss={() => setError(null)} onRetry={load} />
+        <PageErrorAlert
+          error={error}
+          onDismiss={create.error ? create.reset : submit.error ? submit.reset : undefined}
+          onRetry={() => void expensesQuery.refetch()}
+        />
       )}
 
-      <ExpenseForm saving={saving} onCreate={create} />
+      <ExpenseForm saving={create.isPending} onCreate={createExpense} />
 
-      {loading ? (
+      {expensesQuery.isPending ? (
         <Spinner />
-      ) : expenses.length === 0 && !error ? (
+      ) : expensesQuery.data?.length === 0 && !error ? (
         <div className="empty">No expenses yet. Create your first request above.</div>
       ) : (
-        expenses.map((x) => (
-          <ExpenseCard key={x.id} expense={x}>
-            {canTransition(x, "submit") && (
-              <button disabled={busyId === x.id} onClick={() => submit(x.id)}>
-                {busyId === x.id ? "Submitting…" : "Submit for approval"}
+        expensesQuery.data?.map((expense) => (
+          <ExpenseCard key={expense.id} expense={expense}>
+            {canTransition(expense, "submit") && (
+              <button
+                disabled={submit.isPending}
+                onClick={() => submitExpense(expense.id)}
+              >
+                {submit.isPending && submit.variables === expense.id
+                  ? "Submitting…"
+                  : "Submit for approval"}
               </button>
             )}
           </ExpenseCard>

@@ -1,13 +1,16 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { Expense } from "@/lib/types";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { RejectExpenseForm } from "@/components/RejectExpenseForm";
-import { PageErrorAlert, type PageError } from "@/components/PageErrorAlert";
+import { PageErrorAlert } from "@/components/PageErrorAlert";
 import { SearchInput } from "@/components/SearchInput";
 import { Spinner } from "@/components/Spinner";
 import { getClientErrorMessage, reportClientError } from "@/lib/clientError";
+
+const submittedExpensesKey = ["expenses", "submitted"] as const;
 
 function ApprovalActions({
   busy,
@@ -30,88 +33,85 @@ function ApprovalActions({
   );
 }
 
+type Action = { id: string; event: "approve" | "reject"; text?: string };
+
 export default function ApprovalsPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<PageError | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const controller = useRef<AbortController | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = [...submittedExpensesKey, query] as const;
 
-  const load = useCallback(async (q: string) => {
-    controller.current?.abort(); // drop stale in-flight searches
-    const ctrl = (controller.current = new AbortController());
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.list({ status: "submitted", q }, ctrl.signal);
-      if (ctrl.signal.aborted || controller.current !== ctrl) return;
-      setExpenses(data);
-    } catch (e) {
-      const message = getClientErrorMessage(e);
-      if (message && !ctrl.signal.aborted && controller.current === ctrl) {
-        setError({ title: "Unable to load approval queue", message, canRetry: true });
-      }
-    } finally {
-      if (controller.current === ctrl) setLoading(false);
-    }
-  }, []);
+  const expensesQuery = useQuery({
+    queryKey,
+    queryFn: ({ signal }) => api.list({ status: "submitted", q: query }, signal),
+  });
 
-  useEffect(() => {
-    load(query);
-    return () => controller.current?.abort();
-  }, [query, load]);
-
-  async function act(id: string, event: "approve" | "reject", text?: string) {
-    setBusyId(id);
-    setError(null);
-    try {
-      await api.transition(id, event, text);
-      setExpenses((prev) => prev.filter((x) => x.id !== id));
+  const transition = useMutation({
+    mutationFn: ({ id, event, text }: Action) => api.transition(id, event, text),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: submittedExpensesKey });
       setRejectingId(null);
-    } catch (e) {
-      const message = getClientErrorMessage(e);
-      if (!message) return;
-      setError({ title: "Unable to update expense", message, canRetry: false });
-      // The expense may have been handled elsewhere; refresh so the queue isn't stale.
+    },
+    onError: async () => {
       try {
-        setExpenses(await api.list({ status: "submitted", q: query }));
+        await queryClient.invalidateQueries({ queryKey: submittedExpensesKey });
       } catch (refreshError) {
-        // Keep the original error, but make the refresh failure visible to monitoring.
         reportClientError(refreshError, { surface: "app/approvals/refresh-after-action" });
       }
-    } finally {
-      setBusyId(null);
-    }
+    },
+  });
+
+  // Apply an approval decision, update the queue, and recover from stale data.
+  function act(id: string, event: "approve" | "reject", text?: string) {
+    transition.mutate({ id, event, text });
   }
+
+  const error = transition.error
+    ? {
+        title: "Unable to update expense",
+        message: getClientErrorMessage(transition.error) ?? "Unable to update expense",
+        canRetry: false,
+      }
+    : expensesQuery.error
+      ? {
+          title: "Unable to load approval queue",
+          message: getClientErrorMessage(expensesQuery.error) ?? "Unable to load approval queue",
+          canRetry: true,
+        }
+      : null;
 
   return (
     <>
       <h1>Approval Queue</h1>
       <SearchInput onSearch={setQuery} placeholder="Search by title or line item…" />
       {error && (
-        <PageErrorAlert error={error} onDismiss={() => setError(null)} onRetry={() => load(query)} />
+        <PageErrorAlert
+          error={error}
+          onDismiss={transition.error ? transition.reset : undefined}
+          onRetry={() => void expensesQuery.refetch()}
+        />
       )}
-      {loading ? (
+      {expensesQuery.isPending ? (
         <Spinner />
-      ) : expenses.length === 0 && !error ? (
-        <div className="empty">{query ? `No submitted expenses match “${query}”.` : "Nothing waiting for approval."}</div>
+      ) : expensesQuery.data?.length === 0 && !error ? (
+        <div className="empty">
+          {query ? `No submitted expenses match “${query}”.` : "Nothing waiting for approval."}
+        </div>
       ) : (
-        expenses.map((x) => (
-          <ExpenseCard key={x.id} expense={x}>
-            {rejectingId === x.id ? (
+        expensesQuery.data?.map((expense) => (
+          <ExpenseCard key={expense.id} expense={expense}>
+            {rejectingId === expense.id ? (
               <RejectExpenseForm
-                expenseId={x.id}
-                busy={busyId === x.id}
-                onConfirm={(text) => act(x.id, "reject", text)}
+                expenseId={expense.id}
+                busy={transition.isPending && transition.variables?.id === expense.id}
+                onConfirm={(text) => act(expense.id, "reject", text)}
                 onCancel={() => setRejectingId(null)}
               />
             ) : (
               <ApprovalActions
-                busy={busyId === x.id}
-                onApprove={() => act(x.id, "approve")}
-                onReject={() => setRejectingId(x.id)}
+                busy={transition.isPending && transition.variables?.id === expense.id}
+                onApprove={() => act(expense.id, "approve")}
+                onReject={() => setRejectingId(expense.id)}
               />
             )}
           </ExpenseCard>

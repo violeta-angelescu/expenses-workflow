@@ -12,7 +12,7 @@ export function PageErrorAlert({
   onRetry,
 }: {
   error: PageError;
-  onDismiss: () => void;
+  onDismiss?: () => void;
   onRetry: () => void;
 }) {
   return (

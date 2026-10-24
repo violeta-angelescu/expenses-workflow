@@ -25,11 +25,19 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  let body: unknown;
+
   try {
-    const body = await req.json().catch(() => null);
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  try {
     const parsed = parseCreateBody(body);
     if (typeof parsed === "string") return NextResponse.json({ error: parsed }, { status: 400 });
-    return NextResponse.json(await store.create(parsed.title, parsed.lineItems), { status: 201 });
+    const createdExpense = await store.create(parsed.title, parsed.lineItems);
+    return NextResponse.json(createdExpense, { status: 201 });
   } catch (error) {
     return handleApiError(error, req);
   }
