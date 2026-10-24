@@ -8,7 +8,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     if ((e as Error).name === "AbortError") throw e;
     throw new Error("Network error. Please try again.");
   }
-  const data = await res.json().catch(() => null);
+  const data = await res.json().catch((e) => {
+    if ((e as Error).name === "AbortError") throw e;
+    return null;
+  });
   if (!res.ok) throw new Error(data?.error ?? `Request failed (${res.status})`);
   return data as T;
 }

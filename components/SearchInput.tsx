@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** Debounced search box: calls onSearch once the user pauses typing. */
 export function SearchInput({
@@ -10,11 +10,23 @@ export function SearchInput({
   placeholder?: string;
 }) {
   const [value, setValue] = useState("");
+  // Keep the latest callback without re-running the debounce when its identity changes.
+  const onSearchRef = useRef(onSearch);
+  const lastSent = useRef("");
 
   useEffect(() => {
-    const t = setTimeout(() => onSearch(value.trim()), 300);
+    onSearchRef.current = onSearch;
+  });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const query = value.trim();
+      if (query === lastSent.current) return;
+      lastSent.current = query;
+      onSearchRef.current(query);
+    }, 300);
     return () => clearTimeout(t);
-  }, [value, onSearch]);
+  }, [value]);
 
   return (
     <input

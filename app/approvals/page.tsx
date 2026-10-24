@@ -27,6 +27,7 @@ export default function ApprovalsPage() {
     setCanRetryLoad(false);
     try {
       const data = await api.list({ status: "submitted", q }, ctrl.signal);
+      if (ctrl.signal.aborted) return;
       setExpenses(data);
       setLoading(false);
     } catch (e) {

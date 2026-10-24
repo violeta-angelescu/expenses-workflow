@@ -1,38 +1,75 @@
 import { randomUUID } from "node:crypto";
-import type { Expense, LineItem } from "./types";
+import type { Filter } from "mongodb";
+import { database } from "./db";
+import type { Expense, ExpenseStatus, LineItem } from "./types";
 
-const now = () => new Date().toISOString();
-const sum = (items: LineItem[]) => Math.round(items.reduce((t, i) => t + i.amount, 0) * 100) / 100;
+type ExpenseDocument = Omit<Expense, "id" | "createdAt" | "updatedAt"> & {
+  _id: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-function seed(): Map<string, Expense> {
-  const mk = (title: string, lineItems: LineItem[], status: Expense["status"]): Expense => ({
-    id: randomUUID(), title, lineItems, total: sum(lineItems), status, createdAt: now(), updatedAt: now(),
-  });
-  const list = [
-    mk("Conference travel", [{ description: "Flight", amount: 420 }, { description: "Hotel", amount: 310.5 }], "submitted"),
-    mk("Team lunch", [{ description: "Restaurant", amount: 96.2 }], "draft"),
-  ];
-  return new Map(list.map((e) => [e.id, e]));
+const expenses = database.collection<ExpenseDocument>("expenses");
+
+function toExpense({ _id: id, createdAt, updatedAt, ...expense }: ExpenseDocument): Expense {
+  return {
+    ...expense,
+    id,
+    createdAt: createdAt.toISOString(),
+    updatedAt: updatedAt.toISOString(),
+  };
 }
 
-// Survive Next.js dev hot reloads.
-const g = globalThis as unknown as { __expenses?: Map<string, Expense> };
-const expenses = (g.__expenses ??= seed());
+function toDocument(expense: Expense): ExpenseDocument {
+  const { id, createdAt, updatedAt, ...fields } = expense;
+  return {
+    ...fields,
+    _id: id,
+    createdAt: new Date(createdAt),
+    updatedAt: new Date(updatedAt),
+  };
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 export const store = {
-  list(): Expense[] {
-    return [...expenses.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  async list(filters: { status?: ExpenseStatus; query?: string } = {}): Promise<Expense[]> {
+    const filter: Filter<ExpenseDocument> = filters.status ? { status: filters.status } : {};
+    const query = filters.query?.trim();
+
+    if (query) {
+      const pattern = new RegExp(escapeRegex(query), "i");
+      filter.$or = [{ title: pattern }, { "lineItems.description": pattern }];
+    }
+
+    const documents = await expenses.find(filter).sort({ createdAt: -1 }).toArray();
+    return documents.map(toExpense);
   },
-  get: (id: string) => expenses.get(id),
-  create(title: string, lineItems: LineItem[]): Expense {
-    const e: Expense = {
-      id: randomUUID(), title, lineItems, total: sum(lineItems),
-      status: "draft", createdAt: now(), updatedAt: now(),
+
+  async get(id: string): Promise<Expense | undefined> {
+    const document = await expenses.findOne({ _id: id });
+    return document ? toExpense(document) : undefined;
+  },
+
+  async create(title: string, lineItems: LineItem[]): Promise<Expense> {
+    const now = new Date().toISOString();
+    const expense: Expense = {
+      id: randomUUID(),
+      title,
+      lineItems,
+      total: Math.round(lineItems.reduce((sum, item) => sum + item.amount, 0) * 100) / 100,
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
     };
-    expenses.set(e.id, e);
-    return e;
+    await expenses.insertOne(toDocument(expense));
+    return expense;
   },
-  save(e: Expense) {
-    expenses.set(e.id, e);
+
+  async save(expense: Expense): Promise<Expense> {
+    await expenses.replaceOne({ _id: expense.id }, toDocument(expense));
+    return expense;
   },
 };
