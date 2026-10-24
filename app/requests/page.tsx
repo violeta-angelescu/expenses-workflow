@@ -5,15 +5,14 @@ import { canTransition } from "@/lib/expenseMachine";
 import type { Expense } from "@/lib/types";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { ExpenseForm, type ExpenseFormData } from "@/components/ExpenseForm";
-import { Alert } from "@/components/Alert";
+import { PageErrorAlert, type PageError } from "@/components/PageErrorAlert";
 import { Spinner } from "@/components/Spinner";
+import { getClientErrorMessage } from "@/lib/clientError";
 
 export default function RequestsPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [errorTitle, setErrorTitle] = useState("Error");
-  const [canRetryLoad, setCanRetryLoad] = useState(false);
+  const [error, setError] = useState<PageError | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -21,13 +20,12 @@ export default function RequestsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setCanRetryLoad(false);
     try {
       setExpenses(await api.list());
     } catch (e) {
-      setErrorTitle("Unable to load requests");
-      setError((e as Error).message);
-      setCanRetryLoad(true);
+      const message = getClientErrorMessage(e);
+      if (!message) return;
+      setError({ title: "Unable to load requests", message, canRetry: true });
     } finally {
       setLoading(false);
     }
@@ -38,7 +36,6 @@ export default function RequestsPage() {
   async function create({ title, items }: ExpenseFormData) {
     setSaving(true);
     setError(null);
-    setCanRetryLoad(false);
     try {
       const created = await api.create(
         title,
@@ -47,8 +44,9 @@ export default function RequestsPage() {
       setExpenses((prev) => [created, ...prev]);
       return true;
     } catch (err) {
-      setErrorTitle("Unable to create expense");
-      setError((err as Error).message);
+      const message = getClientErrorMessage(err);
+      if (!message) return false;
+      setError({ title: "Unable to create expense", message, canRetry: false });
       return false;
     } finally {
       setSaving(false);
@@ -58,13 +56,13 @@ export default function RequestsPage() {
   async function submit(id: string) {
     setBusyId(id);
     setError(null);
-    setCanRetryLoad(false);
     try {
       const updated = await api.transition(id, "submit");
       setExpenses((prev) => prev.map((x) => (x.id === id ? updated : x)));
     } catch (err) {
-      setErrorTitle("Unable to submit expense");
-      setError((err as Error).message);
+      const message = getClientErrorMessage(err);
+      if (!message) return;
+      setError({ title: "Unable to submit expense", message, canRetry: false });
     } finally {
       setBusyId(null);
     }
@@ -74,10 +72,7 @@ export default function RequestsPage() {
     <>
       <h1>My Requests</h1>
       {error && (
-        <Alert title={errorTitle} onDismiss={() => setError(null)}>
-          <span>{error}</span>
-          {canRetryLoad && <button className="secondary" onClick={load}>Retry</button>}
-        </Alert>
+        <PageErrorAlert error={error} onDismiss={() => setError(null)} onRetry={load} />
       )}
 
       <ExpenseForm saving={saving} onCreate={create} />

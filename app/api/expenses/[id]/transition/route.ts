@@ -20,11 +20,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "Comment must be a string" }, { status: 400 });
     }
     const next = transition(expense, body.event, { comment: body.comment ?? undefined });
-    return NextResponse.json(await store.save(next));
+    if (!(await store.save(next, expense.status))) {
+      return NextResponse.json(
+        { error: "Expense was updated by another request" },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json(next);
   } catch (err) {
     if (err instanceof TransitionError) {
       return NextResponse.json({ error: err.message }, { status: err.kind === "invalid_transition" ? 409 : 422 });
     }
-    return handleApiError(err, { route: "POST /api/expenses/[id]/transition" });
+    return handleApiError(err, req);
   }
 }

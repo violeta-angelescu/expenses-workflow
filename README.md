@@ -24,7 +24,9 @@ Loading indicators, empty states, and error handling for failed API calls.
 
 The Next.js pages call route handlers through the shared API client. The route
 handlers delegate validation and state transitions to the domain logic, which
-currently stores expenses in memory.
+persists expenses in MongoDB. Transitions are written only if the stored status
+still matches the status that was validated, preventing concurrent requests
+from applying conflicting actions.
 
 ```mermaid
 flowchart TD

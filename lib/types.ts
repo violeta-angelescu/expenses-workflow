@@ -1,4 +1,10 @@
-export type ExpenseStatus = "draft" | "submitted" | "approved" | "rejected";
+export const EXPENSE_STATUSES = ["draft", "submitted", "approved", "rejected"] as const;
+export type ExpenseStatus = typeof EXPENSE_STATUSES[number];
+
+export function isExpenseStatus(value: string): value is ExpenseStatus {
+  return EXPENSE_STATUSES.includes(value as ExpenseStatus);
+}
+
 export type ExpenseEvent = "submit" | "approve" | "reject";
 
 export interface LineItem {

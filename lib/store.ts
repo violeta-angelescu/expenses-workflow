@@ -68,8 +68,11 @@ export const store = {
     return expense;
   },
 
-  async save(expense: Expense): Promise<Expense> {
-    await expenses.replaceOne({ _id: expense.id }, toDocument(expense));
-    return expense;
+  async save(expense: Expense, expectedStatus: ExpenseStatus): Promise<boolean> {
+    const result = await expenses.replaceOne(
+      { _id: expense.id, status: expectedStatus },
+      toDocument(expense),
+    );
+    return result.matchedCount === 1;
   },
 };

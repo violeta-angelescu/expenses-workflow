@@ -1,4 +1,4 @@
-import { money } from "@/lib/api";
+import { money } from "@/lib/format";
 import type { Expense } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
 

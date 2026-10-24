@@ -3,20 +3,40 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { Expense } from "@/lib/types";
 import { ExpenseCard } from "@/components/ExpenseCard";
+import { RejectExpenseForm } from "@/components/RejectExpenseForm";
+import { PageErrorAlert, type PageError } from "@/components/PageErrorAlert";
 import { SearchInput } from "@/components/SearchInput";
-import { Alert } from "@/components/Alert";
 import { Spinner } from "@/components/Spinner";
+import { getClientErrorMessage, reportClientError } from "@/lib/clientError";
+
+function ApprovalActions({
+  busy,
+  onApprove,
+  onReject,
+}: {
+  busy: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <span className="form-row" style={{ margin: 0 }}>
+      <button type="button" disabled={busy} onClick={onApprove}>
+        {busy ? "Approving…" : "Approve"}
+      </button>
+      <button type="button" className="danger" disabled={busy} onClick={onReject}>
+        Reject
+      </button>
+    </span>
+  );
+}
 
 export default function ApprovalsPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [errorTitle, setErrorTitle] = useState("Error");
-  const [canRetryLoad, setCanRetryLoad] = useState(false);
+  const [error, setError] = useState<PageError | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
   const controller = useRef<AbortController | null>(null);
 
   const load = useCallback(async (q: string) => {
@@ -24,18 +44,17 @@ export default function ApprovalsPage() {
     const ctrl = (controller.current = new AbortController());
     setLoading(true);
     setError(null);
-    setCanRetryLoad(false);
     try {
       const data = await api.list({ status: "submitted", q }, ctrl.signal);
-      if (ctrl.signal.aborted) return;
+      if (ctrl.signal.aborted || controller.current !== ctrl) return;
       setExpenses(data);
-      setLoading(false);
     } catch (e) {
-      if ((e as Error).name === "AbortError") return;
-      setError((e as Error).message);
-      setErrorTitle("Unable to load approval queue");
-      setCanRetryLoad(true);
-      setLoading(false);
+      const message = getClientErrorMessage(e);
+      if (message && !ctrl.signal.aborted && controller.current === ctrl) {
+        setError({ title: "Unable to load approval queue", message, canRetry: true });
+      }
+    } finally {
+      if (controller.current === ctrl) setLoading(false);
     }
   }, []);
 
@@ -47,15 +66,21 @@ export default function ApprovalsPage() {
   async function act(id: string, event: "approve" | "reject", text?: string) {
     setBusyId(id);
     setError(null);
-    setCanRetryLoad(false);
     try {
       await api.transition(id, event, text);
       setExpenses((prev) => prev.filter((x) => x.id !== id));
       setRejectingId(null);
-      setComment("");
     } catch (e) {
-      setErrorTitle("Unable to update expense");
-      setError((e as Error).message);
+      const message = getClientErrorMessage(e);
+      if (!message) return;
+      setError({ title: "Unable to update expense", message, canRetry: false });
+      // The expense may have been handled elsewhere; refresh so the queue isn't stale.
+      try {
+        setExpenses(await api.list({ status: "submitted", q: query }));
+      } catch (refreshError) {
+        // Keep the original error, but make the refresh failure visible to monitoring.
+        reportClientError(refreshError, { surface: "app/approvals/refresh-after-action" });
+      }
     } finally {
       setBusyId(null);
     }
@@ -66,10 +91,7 @@ export default function ApprovalsPage() {
       <h1>Approval Queue</h1>
       <SearchInput onSearch={setQuery} placeholder="Search by title or line item…" />
       {error && (
-        <Alert title={errorTitle} onDismiss={() => setError(null)}>
-          <span>{error}</span>
-          {canRetryLoad && <button className="secondary" onClick={() => load(query)}>Retry</button>}
-        </Alert>
+        <PageErrorAlert error={error} onDismiss={() => setError(null)} onRetry={() => load(query)} />
       )}
       {loading ? (
         <Spinner />
@@ -79,22 +101,18 @@ export default function ApprovalsPage() {
         expenses.map((x) => (
           <ExpenseCard key={x.id} expense={x}>
             {rejectingId === x.id ? (
-              <form
-                className="form-row"
-                onSubmit={(e) => { e.preventDefault(); act(x.id, "reject", comment); }}
-              >
-                <input
-                  autoFocus placeholder="Reason (required)" value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                />
-                <button className="danger" disabled={busyId === x.id || !comment.trim()}>Confirm</button>
-                <button type="button" className="secondary" onClick={() => { setRejectingId(null); setComment(""); }}>Cancel</button>
-              </form>
+              <RejectExpenseForm
+                expenseId={x.id}
+                busy={busyId === x.id}
+                onConfirm={(text) => act(x.id, "reject", text)}
+                onCancel={() => setRejectingId(null)}
+              />
             ) : (
-              <span className="form-row" style={{ margin: 0 }}>
-                <button disabled={busyId === x.id} onClick={() => act(x.id, "approve")}>Approve</button>
-                <button className="danger" disabled={busyId === x.id} onClick={() => setRejectingId(x.id)}>Reject</button>
-              </span>
+              <ApprovalActions
+                busy={busyId === x.id}
+                onApprove={() => act(x.id, "approve")}
+                onReject={() => setRejectingId(x.id)}
+              />
             )}
           </ExpenseCard>
         ))
