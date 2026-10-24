@@ -1,15 +1,11 @@
 import type { Expense, ExpenseEvent, ExpenseStatus } from "./types";
 
-/**
- * Declarative state machine: every legal transition lives in this table.
- * Anything not listed is invalid, so callers never need ad-hoc status checks.
- */
 interface TransitionDef {
   to: ExpenseStatus;
   /** Returns an error message when the transition must be refused. */
   guard?: (expense: Expense, payload: TransitionPayload) => string | null;
-  /** Applies side effects of the transition to the (already copied) expense. */
-  apply?: (expense: Expense, payload: TransitionPayload) => void;
+  /** Returns fields to apply to the transitioned expense. */
+  update?: (payload: TransitionPayload) => Partial<Expense>;
 }
 
 export interface TransitionPayload {
@@ -28,14 +24,36 @@ const machine: Record<ExpenseStatus, Partial<Record<ExpenseEvent, TransitionDef>
     reject: {
       to: "rejected",
       guard: (_, p) => (p.comment?.trim() ? null : "A comment is required to reject an expense"),
-      apply: (e, p) => {
-        e.rejectionComment = p.comment!.trim();
-      },
+      update: (p) => ({ rejectionComment: p.comment!.trim() }),
     },
   },
   approved: {},
   rejected: {},
 };
+
+type TransitionResolution =
+  | { ok: true; definition: TransitionDef }
+  | { ok: false; kind: "invalid_transition" | "guard_failed"; message: string };
+
+function resolveTransition(
+  expense: Expense,
+  event: ExpenseEvent,
+  payload: TransitionPayload,
+): TransitionResolution {
+  const definition = machine[expense.status][event];
+  if (!definition) {
+    return {
+      ok: false,
+      kind: "invalid_transition",
+      message: `Cannot ${event} an expense that is ${expense.status}`,
+    };
+  }
+
+  const error = definition.guard?.(expense, payload);
+  if (error) return { ok: false, kind: "guard_failed", message: error };
+
+  return { ok: true, definition };
+}
 
 export class TransitionError extends Error {
   constructor(message: string, readonly kind: "invalid_transition" | "guard_failed") {
@@ -43,20 +61,23 @@ export class TransitionError extends Error {
   }
 }
 
-export function canTransition(status: ExpenseStatus, event: ExpenseEvent): boolean {
-  return Boolean(machine[status][event]);
+export function canTransition(
+  expense: Expense,
+  event: ExpenseEvent,
+  payload: TransitionPayload = {},
+): boolean {
+  return resolveTransition(expense, event, payload).ok;
 }
 
 /** Pure: returns a new expense or throws TransitionError. */
 export function transition(expense: Expense, event: ExpenseEvent, payload: TransitionPayload = {}): Expense {
-  const def = machine[expense.status][event];
-  if (!def) {
-    throw new TransitionError(`Cannot ${event} an expense that is ${expense.status}`, "invalid_transition");
-  }
-  const error = def.guard?.(expense, payload);
-  if (error) throw new TransitionError(error, "guard_failed");
+  const result = resolveTransition(expense, event, payload);
+  if (!result.ok) throw new TransitionError(result.message, result.kind);
 
-  const next: Expense = { ...expense, status: def.to, updatedAt: new Date().toISOString() };
-  def.apply?.(next, payload);
-  return next;
+  return {
+    ...expense,
+    ...result.definition.update?.(payload),
+    status: result.definition.to,
+    updatedAt: new Date().toISOString(),
+  };
 }

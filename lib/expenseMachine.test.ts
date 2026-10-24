@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { transition, TransitionError } from "./expenseMachine";
+import { canTransition, transition, TransitionError } from "./expenseMachine";
 import type { Expense } from "./types";
 
 const base: Expense = {
@@ -21,6 +21,16 @@ test("reject requires comment", () => {
   const r = transition(s, "reject", { comment: " too high " });
   assert.equal(r.status, "rejected");
   assert.equal(r.rejectionComment, "too high");
+});
+
+test("canTransition evaluates guards", () => {
+  const emptyDraft = { ...base, lineItems: [] };
+  const submitted = transition(base, "submit");
+
+  assert.equal(canTransition(emptyDraft, "submit"), false);
+  assert.equal(canTransition(submitted, "reject"), false);
+  assert.equal(canTransition(submitted, "reject", { comment: "too high" }), true);
+  assert.equal(canTransition(base, "submit"), true);
 });
 
 test("invalid transitions are refused", () => {

@@ -89,7 +89,7 @@ export default function RequestsPage() {
       ) : (
         expenses.map((x) => (
           <ExpenseCard key={x.id} expense={x}>
-            {canTransition(x.status, "submit") && (
+            {canTransition(x, "submit") && (
               <button disabled={busyId === x.id} onClick={() => submit(x.id)}>
                 {busyId === x.id ? "Submitting…" : "Submit for approval"}
               </button>
