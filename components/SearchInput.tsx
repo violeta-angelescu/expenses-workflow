@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { Input } from "./ui/input";
 
 /** Debounced search box: calls onSearch once the user pauses typing. */
 export function SearchInput({
@@ -29,7 +30,7 @@ export function SearchInput({
   }, [value]);
 
   return (
-    <input
+    <Input
       type="search"
       aria-label="Search expenses"
       placeholder={placeholder}

@@ -50,25 +50,33 @@ export default function RequestsPage() {
     submit.mutate(id);
   }
 
-  const error = create.error
-    ? {
+  const error = (() => {
+    if (create.error) {
+      return {
         title: "Unable to create expense",
         message: getClientErrorMessage(create.error) ?? "Unable to create expense",
         canRetry: false,
-      }
-    : submit.error
-      ? {
-          title: "Unable to submit expense",
-          message: getClientErrorMessage(submit.error) ?? "Unable to submit expense",
-          canRetry: false,
-        }
-      : expensesQuery.error
-        ? {
-            title: "Unable to load requests",
-            message: getClientErrorMessage(expensesQuery.error) ?? "Unable to load requests",
-            canRetry: true,
-          }
-        : null;
+      };
+    }
+
+    if (submit.error) {
+      return {
+        title: "Unable to submit expense",
+        message: getClientErrorMessage(submit.error) ?? "Unable to submit expense",
+        canRetry: false,
+      };
+    }
+
+    if (expensesQuery.error) {
+      return {
+        title: "Unable to load requests",
+        message: getClientErrorMessage(expensesQuery.error) ?? "Unable to load requests",
+        canRetry: true,
+      };
+    }
+
+    return null;
+  })();
 
   return (
     <>

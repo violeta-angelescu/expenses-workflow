@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { reportClientError } from "@/lib/clientError";
+import { Button } from "@/components/ui/button";
 
 // Replaces the root layout when active, so it renders its own <html> and <body>.
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
@@ -13,7 +14,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
     <html lang="en">
       <body>
         <h2>Something went wrong</h2>
-        <button onClick={reset}>Try again</button>
+        <Button onClick={reset}>Try again</Button>
       </body>
     </html>
   );

@@ -9,6 +9,7 @@ import { PageErrorAlert } from "@/components/PageErrorAlert";
 import { SearchInput } from "@/components/SearchInput";
 import { Spinner } from "@/components/Spinner";
 import { getClientErrorMessage, reportClientError } from "@/lib/clientError";
+import { Button } from "@/components/ui/button";
 
 const submittedExpensesKey = ["expenses", "submitted"] as const;
 
@@ -23,12 +24,12 @@ function ApprovalActions({
 }) {
   return (
     <span className="form-row" style={{ margin: 0 }}>
-      <button type="button" disabled={busy} onClick={onApprove}>
+      <Button type="button" disabled={busy} onClick={onApprove}>
         {busy ? "Approving…" : "Approve"}
-      </button>
-      <button type="button" className="danger" disabled={busy} onClick={onReject}>
+      </Button>
+      <Button type="button" variant="destructive" disabled={busy} onClick={onReject}>
         Reject
-      </button>
+      </Button>
     </span>
   );
 }

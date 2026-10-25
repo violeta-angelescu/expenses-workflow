@@ -5,7 +5,8 @@ export function isExpenseStatus(value: string): value is ExpenseStatus {
   return EXPENSE_STATUSES.includes(value as ExpenseStatus);
 }
 
-export type ExpenseEvent = "submit" | "approve" | "reject";
+export const EXPENSE_EVENTS = ["submit", "approve", "reject"] as const;
+export type ExpenseEvent = typeof EXPENSE_EVENTS[number];
 
 export interface LineItem {
   description: string;

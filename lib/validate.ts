@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { EXPENSE_EVENTS } from "./types";
 
 export const MAX_TITLE_LENGTH = 100;
 export const MAX_DESCRIPTION_LENGTH = 200;
@@ -28,10 +29,22 @@ const createExpenseSchema = z.object({
     .max(MAX_LINE_ITEMS, `At most ${MAX_LINE_ITEMS} line items are allowed`),
 });
 
+const transitionExpenseSchema = z.object({
+  event: z.enum(EXPENSE_EVENTS, { error: "Unknown event" }),
+  comment: z.string({ error: "Comment must be a string" }).nullable().optional(),
+});
+
 export type CreateExpenseBody = z.infer<typeof createExpenseSchema>;
+export type TransitionExpenseBody = z.infer<typeof transitionExpenseSchema>;
 
 export function parseCreateBody(body: unknown): CreateExpenseBody | string {
   const result = createExpenseSchema.safeParse(body);
+  if (!result.success) return result.error.issues[0]?.message ?? "Invalid body";
+  return result.data;
+}
+
+export function parseTransitionBody(body: unknown): TransitionExpenseBody | string {
+  const result = transitionExpenseSchema.safeParse(body);
   if (!result.success) return result.error.issues[0]?.message ?? "Invalid body";
   return result.data;
 }

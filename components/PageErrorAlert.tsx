@@ -1,4 +1,5 @@
 import { Alert } from "@/components/Alert";
+import { Button } from "@/components/ui/button";
 
 export interface PageError {
   title: string;
@@ -19,9 +20,9 @@ export function PageErrorAlert({
     <Alert title={error.title} onDismiss={onDismiss}>
       <span>{error.message}</span>
       {error.canRetry && (
-        <button type="button" className="secondary" onClick={onRetry}>
+        <Button type="button" variant="outline" onClick={onRetry}>
           Retry
-        </button>
+        </Button>
       )}
     </Alert>
   );

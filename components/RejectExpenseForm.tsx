@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export function RejectExpenseForm({
   expenseId,
@@ -30,10 +33,10 @@ export function RejectExpenseForm({
 
   return (
     <form className="form-row" onSubmit={submit}>
-      <label className="sr-only" htmlFor={rejectExpenseId}>
+      <Label className="sr-only" htmlFor={rejectExpenseId}>
         Reason for rejection
-      </label>
-      <input
+      </Label>
+      <Input
         id={rejectExpenseId}
         required
         autoFocus
@@ -41,17 +44,17 @@ export function RejectExpenseForm({
         value={comment}
         onChange={(event) => setComment(event.target.value)}
       />
-      <button className="danger" disabled={busy || !comment.trim()}>
+      <Button variant="destructive" disabled={busy || !comment.trim()}>
         {busy ? "Rejecting…" : "Confirm rejection"}
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
-        className="secondary"
+        variant="outline"
         onClick={cancel}
         disabled={busy}
       >
         Cancel
-      </button>
+      </Button>
     </form>
   );
 }

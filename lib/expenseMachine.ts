@@ -69,7 +69,10 @@ export function canTransition(
   return resolveTransition(expense, event, payload).ok;
 }
 
-/** Pure: returns a new expense or throws TransitionError. */
+/**
+ * Validates and applies an event, returning a new expense with its next status
+ * and updated timestamp, or throws TransitionError when the event is refused.
+ */
 export function transition(expense: Expense, event: ExpenseEvent, payload: TransitionPayload = {}): Expense {
   const result = resolveTransition(expense, event, payload);
   if (!result.ok) throw new TransitionError(result.message, result.kind);
