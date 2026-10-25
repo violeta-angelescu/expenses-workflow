@@ -1,27 +1,56 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCreateBody } from "./validate";
+import {
+  MAX_AMOUNT,
+  MAX_COMMENT_LENGTH,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_LINE_ITEMS,
+  MAX_TITLE_LENGTH,
+  parseCreateBody,
+  parseTransitionBody,
+} from "./validate";
 
-const body = (amount: unknown) => ({ title: "t", lineItems: [{ description: "a", amount }] });
+const item = { description: "a", amount: 1 };
+const create = (overrides: object = {}) => parseCreateBody({ title: "t", lineItems: [item], ...overrides });
+const withAmount = (amount: unknown) => create({ lineItems: [{ ...item, amount }] });
+const assertValid = (result: unknown) => assert.notEqual(typeof result, "string");
+const assertInvalid = (result: unknown, message?: string) => assert.equal(typeof result, "string", message);
 
 test("accepts a valid body and trims text", () => {
-  const r = parseCreateBody({ title: " t ", lineItems: [{ description: " a ", amount: 12.34 }] });
-  assert.deepEqual(r, { title: "t", lineItems: [{ description: "a", amount: 12.34 }] });
+  const result = create({ title: " t ", lineItems: [{ description: " a ", amount: 12.34 }] });
+  assert.deepEqual(result, { title: "t", lineItems: [{ description: "a", amount: 12.34 }] });
 });
 
-test("rejects amounts that are not whole cents, non-positive or too large", () => {
-  for (const amount of [0.001, 1e-7, 0, -1, NaN, Infinity, 1.7e308, 1_000_000.01, "5"]) {
-    assert.equal(typeof parseCreateBody(body(amount)), "string", String(amount));
+test("rejects amounts that are not whole cents, positive and within the limit", () => {
+  for (const amount of [0.001, 0, -1, NaN, Infinity, MAX_AMOUNT + 0.01, "5"]) {
+    assertInvalid(withAmount(amount), String(amount));
   }
-  assert.equal(typeof parseCreateBody(body(0.01)), "object");
-  assert.equal(typeof parseCreateBody(body(19.99)), "object");
+  for (const amount of [0.01, 19.99, MAX_AMOUNT]) {
+    assertValid(withAmount(amount));
+  }
 });
 
-test("rejects missing or oversized text and too many items", () => {
-  assert.equal(typeof parseCreateBody({ ...body(1), title: " " }), "string");
-  assert.equal(typeof parseCreateBody({ ...body(1), title: "x".repeat(201) }), "string");
-  assert.equal(typeof parseCreateBody({ title: "t", lineItems: [{ description: "x".repeat(201), amount: 1 }] }), "string");
-  const many = Array.from({ length: 51 }, () => ({ description: "a", amount: 1 }));
-  assert.equal(typeof parseCreateBody({ title: "t", lineItems: many }), "string");
-  assert.equal(typeof parseCreateBody(null), "string");
+test("enforces title, description and line item limits", () => {
+  assertInvalid(create({ title: " " }));
+  assertValid(create({ title: "x".repeat(MAX_TITLE_LENGTH) }));
+  assertInvalid(create({ title: "x".repeat(MAX_TITLE_LENGTH + 1) }));
+
+  const describe = (description: string) => create({ lineItems: [{ ...item, description }] });
+  assertValid(describe("x".repeat(MAX_DESCRIPTION_LENGTH)));
+  assertInvalid(describe("x".repeat(MAX_DESCRIPTION_LENGTH + 1)));
+
+  const items = (n: number) => Array.from({ length: n }, () => item);
+  assertInvalid(create({ lineItems: [] }));
+  assertValid(create({ lineItems: items(MAX_LINE_ITEMS) }));
+  assertInvalid(create({ lineItems: items(MAX_LINE_ITEMS + 1) }));
+
+  assertInvalid(parseCreateBody(null));
+});
+
+test("transition body validates event and comment", () => {
+  assertValid(parseTransitionBody({ event: "approve", comment: null }));
+  assertValid(parseTransitionBody({ event: "reject", comment: "x".repeat(MAX_COMMENT_LENGTH) }));
+  assertInvalid(parseTransitionBody({ event: "reject", comment: "x".repeat(MAX_COMMENT_LENGTH + 1) }));
+  assertInvalid(parseTransitionBody({ event: "reject", comment: 5 }));
+  assertInvalid(parseTransitionBody({ event: "nope" }));
 });

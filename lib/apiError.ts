@@ -4,7 +4,9 @@ import { logger } from "./logger";
 
 export function handleApiError(error: unknown, request: Request) {
   const url = new URL(request.url);
-  const requestId = request.headers.get("x-request-id") ?? randomUUID();
+  const headerId = request.headers.get("x-request-id");
+  // Client-supplied, so only trust a short, plain token.
+  const requestId = headerId && /^[\w-]{1,64}$/.test(headerId) ? headerId : randomUUID();
   const statusCode = 500;
   logger.error(
     {

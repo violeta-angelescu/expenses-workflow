@@ -15,7 +15,7 @@ export async function GET(req: Request) {
       }
       status = statusParam;
     }
-    const q = params.get("q")?.trim().toLowerCase();
+    const q = params.get("q")?.trim();
 
     const result = await store.list({ status, query: q });
     return NextResponse.json(result);

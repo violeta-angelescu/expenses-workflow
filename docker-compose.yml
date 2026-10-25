@@ -17,6 +17,7 @@ services:
     volumes:
       - mongo-data:/data/db
       - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/01-init.js:ro
+      - ./docker/mongo-seed.js:/docker-entrypoint-initdb.d/02-seed.js:ro
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' localhost:27017/test | grep 1"]
       interval: 5s

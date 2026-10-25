@@ -30,6 +30,8 @@ function toDocument(expense: Expense): ExpenseDocument {
   };
 }
 
+const LIST_LIMIT = 100;
+
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -44,7 +46,7 @@ export const store = {
       filter.$or = [{ title: pattern }, { "lineItems.description": pattern }];
     }
 
-    const documents = await expenses.find(filter).sort({ createdAt: -1 }).toArray();
+    const documents = await expenses.find(filter).sort({ createdAt: -1 }).limit(LIST_LIMIT).toArray();
     return documents.map(toExpense);
   },
 

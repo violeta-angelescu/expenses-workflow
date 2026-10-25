@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MAX_COMMENT_LENGTH } from "@/lib/validate";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -39,6 +40,7 @@ export function RejectExpenseForm({
       <Input
         id={rejectExpenseId}
         required
+        maxLength={MAX_COMMENT_LENGTH}
         autoFocus
         placeholder="Reason (required)"
         value={comment}

@@ -5,6 +5,7 @@ export const MAX_TITLE_LENGTH = 100;
 export const MAX_DESCRIPTION_LENGTH = 200;
 export const MAX_LINE_ITEMS = 10;
 export const MAX_AMOUNT = 100_000;
+export const MAX_COMMENT_LENGTH = 500;
 
 const hasAtMostCents = (amount: number) => Number(amount.toFixed(2)) === amount;
 
@@ -31,7 +32,10 @@ const createExpenseSchema = z.object({
 
 const transitionExpenseSchema = z.object({
   event: z.enum(EXPENSE_EVENTS, { error: "Unknown event" }),
-  comment: z.string({ error: "Comment must be a string" }).nullable().optional(),
+  comment: z.string({ error: "Comment must be a string" })
+    .max(MAX_COMMENT_LENGTH, `Comment must be at most ${MAX_COMMENT_LENGTH} characters`)
+    .nullable()
+    .optional(),
 });
 
 export type CreateExpenseBody = z.infer<typeof createExpenseSchema>;

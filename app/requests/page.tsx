@@ -7,6 +7,7 @@ import { ExpenseCard } from "@/components/ExpenseCard";
 import { ExpenseForm, type ExpenseFormData } from "@/components/ExpenseForm";
 import { PageErrorAlert } from "@/components/PageErrorAlert";
 import { Spinner } from "@/components/Spinner";
+import { Button } from "@/components/ui/button";
 import { getClientErrorMessage } from "@/lib/clientError";
 
 const expensesKey = ["expenses"] as const;
@@ -32,7 +33,8 @@ export default function RequestsPage() {
 
   const submit = useMutation({
     mutationFn: (id: string) => api.transition(id, "submit"),
-    onSuccess: async () => {
+    // Also refresh on failure so a stale card (e.g. 409) shows its real state.
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: expensesKey });
     },
   });
@@ -99,14 +101,14 @@ export default function RequestsPage() {
         expensesQuery.data?.map((expense) => (
           <ExpenseCard key={expense.id} expense={expense}>
             {canTransition(expense, "submit") && (
-              <button
+              <Button
                 disabled={submit.isPending}
                 onClick={() => submitExpense(expense.id)}
               >
                 {submit.isPending && submit.variables === expense.id
                   ? "Submitting…"
                   : "Submit for approval"}
-              </button>
+              </Button>
             )}
           </ExpenseCard>
         ))

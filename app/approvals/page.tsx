@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { RejectExpenseForm } from "@/components/RejectExpenseForm";
@@ -45,13 +45,15 @@ export default function ApprovalsPage() {
   const expensesQuery = useQuery({
     queryKey,
     queryFn: ({ signal }) => api.list({ status: "submitted", q: query }, signal),
+    placeholderData: keepPreviousData,
   });
 
   const transition = useMutation({
     mutationFn: ({ id, event, text }: Action) => api.transition(id, event, text),
-    onSuccess: async () => {
+    onSuccess: async (_expense, { id }) => {
       await queryClient.invalidateQueries({ queryKey: submittedExpensesKey });
-      setRejectingId(null);
+      // Only close the form of the card that was just handled.
+      setRejectingId((current) => (current === id ? null : current));
     },
     onError: async () => {
       try {

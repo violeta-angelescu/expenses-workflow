@@ -4,11 +4,10 @@ import { transition, TransitionError } from "@/lib/expenseMachine";
 import { handleApiError } from "@/lib/apiError";
 import { parseTransitionBody } from "@/lib/validate";
 
+/** Validates and applies an expense transition, then saves it conditionally. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const expense = await store.get(id);
-    if (!expense) return NextResponse.json({ error: "Expense not found" }, { status: 404 });
 
     let rawBody: unknown;
     try {
@@ -18,6 +17,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     const body = parseTransitionBody(rawBody);
     if (typeof body === "string") return NextResponse.json({ error: body }, { status: 400 });
+
+    const expense = await store.get(id);
+    if (!expense) return NextResponse.json({ error: "Expense not found" }, { status: 404 });
 
     const next = transition(expense, body.event, { comment: body.comment ?? undefined });
     if (!(await store.save(next, expense.status))) {
