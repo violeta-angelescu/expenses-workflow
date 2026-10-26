@@ -1,10 +1,9 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { dropDatabase, resetExpenses } from "./db";
+import { resetExpenses } from "./db";
 
 const PAGE_SIZE = 20; // mirrors PAGE_SIZE in lib/store.ts
 
 test.beforeEach(resetExpenses);
-test.afterAll(dropDatabase);
 
 async function seed(request: APIRequestContext, titles: string[], submit = false, amounts: number[] = []) {
   for (const [i, title] of titles.entries()) {
@@ -103,9 +102,14 @@ test("the approval queue can be filtered by min and max price", async ({ page, r
   await expect(page.getByText("Conference trip")).toHaveCount(0);
   await expect(page.getByText("Team lunch")).toBeVisible();
 
+  const listRequests: string[] = [];
+  page.on("request", (req) => req.url().includes("/api/expenses?") && listRequests.push(req.url()));
+
   await page.getByLabel("Maximum price").fill("10");
   const rangeError = page.getByText("Max price cannot be lower than min price");
   await expect(rangeError).toBeVisible();
+  await page.waitForTimeout(500); // longer than any debounce, so a stray request would have been sent
+  expect(listRequests).toEqual([]);
 
   await page.getByLabel("Minimum price").fill("");
   await expect(rangeError).toHaveCount(0);

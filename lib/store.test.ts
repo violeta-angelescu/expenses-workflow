@@ -2,6 +2,7 @@ import { after, before, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { InvalidExpenseCursorError } from "./errors";
+import { createExpenseIndexes } from "../tests/expenseIndexes";
 import type { Expense, ExpenseStatus } from "./types";
 
 // Integration tests: they need MongoDB (MONGODB_URI, default 127.0.0.1, e.g. `docker compose up -d mongo`)
@@ -32,6 +33,7 @@ before(async () => {
   }
 
   await db.database.command({ ping: 1 }); // fail fast if MongoDB is not running
+  await createExpenseIndexes(db.database);
 });
 
 beforeEach(() => db.database.collection("expenses").deleteMany({}));
@@ -122,7 +124,7 @@ test("only returns a nextCursor when more than a page remains", async () => {
 test("returns an empty page without a cursor when nothing matches", async () => {
   assert.deepEqual(await store.list(), { items: [] });
   await seed(3);
-  assert.deepEqual(await store.list({ query: "no such expense" }), { items: [] });
+  assert.deepEqual(await store.list({ query: "zzzznotfound" }), { items: [] });
 });
 
 test("a new expense created between page requests does not shift later pages", async () => {
@@ -134,7 +136,7 @@ test("a new expense created between page requests does not shift later pages", a
   assert.deepEqual([...first.items, ...second.items].map((e) => e.id), expectedIds(expenses));
 });
 
-test("keeps filters while paging and matches search text literally", async () => {
+test("keeps filters while paging and searches indexed text", async () => {
   const statuses: ExpenseStatus[] = ["draft", "submitted", "approved", "rejected"];
   const expenses = await seed(240, 2, (i) => ({
     status: statuses[i % 4],
@@ -144,9 +146,9 @@ test("keeps filters while paging and matches search text literally", async () =>
 
   const cases: [string, Filters, (e: Expense) => boolean][] = [
     ["status", { status: "submitted" }, (e) => e.status === "submitted"],
-    ["title, '.' is literal", { query: "a.b" }, (e) => e.title.includes("a.b")],
-    ["description, parentheses are literal", { query: "(airport)" }, (e) => e.lineItems[0].description.includes("(airport)")],
-    ["status and query", { status: "approved", query: "a.b" }, (e) => e.status === "approved" && e.title.includes("a.b")],
+    ["title", { query: "Trip" }, (e) => e.title.startsWith("Trip")],
+    ["description", { query: "airport" }, (e) => e.lineItems[0].description.includes("airport")],
+    ["status and query", { status: "approved", query: "Trip" }, (e) => e.status === "approved" && e.title.startsWith("Trip")],
   ];
   for (const [name, filters, matches] of cases) {
     const { ids, pageSizes } = await collectAll(filters);
