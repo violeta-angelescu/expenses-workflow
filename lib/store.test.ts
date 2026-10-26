@@ -10,7 +10,7 @@ import type { Expense, ExpenseStatus } from "./types";
 const PAGE_SIZE = 20; // mirrors PAGE_SIZE in store.ts
 const BASE = Date.parse("2026-01-01T00:00:00.000Z");
 
-type Filters = { status?: ExpenseStatus; query?: string };
+type Filters = { status?: ExpenseStatus; query?: string; minTotal?: number; maxTotal?: number };
 
 let store: typeof import("./store").store;
 let db: typeof import("./db");
@@ -151,6 +151,21 @@ test("keeps filters while paging and matches search text literally", async () =>
   for (const [name, filters, matches] of cases) {
     const { ids, pageSizes } = await collectAll(filters);
     assert.ok(pageSizes.length > 1, `${name}: expected several pages`);
+    assert.deepEqual(ids, expectedIds(expenses.filter(matches)), name);
+  }
+});
+
+test("filters by total, inclusive at both bounds, alone or with other filters", async () => {
+  const expenses = await seed(60, 1, (i) => ({ total: i + 1, status: i % 2 === 0 ? "submitted" : "draft" }));
+
+  const cases: [string, Filters, (e: Expense) => boolean][] = [
+    ["min", { minTotal: 50 }, (e) => e.total >= 50],
+    ["max", { maxTotal: 10 }, (e) => e.total <= 10],
+    ["range", { minTotal: 20, maxTotal: 40 }, (e) => e.total >= 20 && e.total <= 40],
+    ["range and status", { status: "submitted", minTotal: 20, maxTotal: 40 }, (e) => e.status === "submitted" && e.total >= 20 && e.total <= 40],
+  ];
+  for (const [name, filters, matches] of cases) {
+    const { ids } = await collectAll(filters);
     assert.deepEqual(ids, expectedIds(expenses.filter(matches)), name);
   }
 });

@@ -6,10 +6,10 @@ const PAGE_SIZE = 20; // mirrors PAGE_SIZE in lib/store.ts
 test.beforeEach(resetExpenses);
 test.afterAll(dropDatabase);
 
-async function seed(request: APIRequestContext, titles: string[], submit = false) {
-  for (const title of titles) {
+async function seed(request: APIRequestContext, titles: string[], submit = false, amounts: number[] = []) {
+  for (const [i, title] of titles.entries()) {
     const created = await request.post("/api/expenses", {
-      data: { title, lineItems: [{ description: "Item", amount: 10 }] },
+      data: { title, lineItems: [{ description: "Item", amount: amounts[i] ?? 10 }] },
     });
     expect(created.ok()).toBeTruthy();
     if (submit) {
@@ -87,6 +87,37 @@ test("the approval queue only shows submitted expenses and can be searched", asy
 
   await page.getByLabel("Search expenses").fill("nothing like this");
   await expect(page.getByText(/No submitted expenses match/)).toBeVisible();
+});
+
+test("the approval queue can be filtered by min and max price", async ({ page, request }) => {
+  await seed(request, ["Cheap snack", "Team lunch", "Conference trip"], true, [5, 50, 500]);
+  await page.goto("/approvals");
+  await expect(page.getByText("Conference trip")).toBeVisible();
+
+  await page.getByLabel("Minimum price").fill("20");
+  await expect(page.getByText("Cheap snack")).toHaveCount(0);
+  await expect(page.getByText("Team lunch")).toBeVisible();
+  await expect(page.getByText("Conference trip")).toBeVisible();
+
+  await page.getByLabel("Maximum price").fill("100");
+  await expect(page.getByText("Conference trip")).toHaveCount(0);
+  await expect(page.getByText("Team lunch")).toBeVisible();
+
+  await page.getByLabel("Maximum price").fill("10");
+  const rangeError = page.getByText("Max price cannot be lower than min price");
+  await expect(rangeError).toBeVisible();
+
+  await page.getByLabel("Minimum price").fill("");
+  await expect(rangeError).toHaveCount(0);
+  await expect(page.getByText("Cheap snack")).toBeVisible();
+  await expect(page.getByText("Team lunch")).toHaveCount(0);
+});
+
+test("the expenses API rejects invalid price filters", async ({ request }) => {
+  for (const query of ["minTotal=abc", "maxTotal=-1", "minTotal=10&maxTotal=5"]) {
+    const res = await request.get(`/api/expenses?${query}`);
+    expect(res.status(), query).toBe(400);
+  }
 });
 
 test("long lists are split into pages without repeating or skipping an expense", async ({ page, request }) => {

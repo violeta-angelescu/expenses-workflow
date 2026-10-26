@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { store } from "@/lib/store";
 import { InvalidExpenseCursorError } from "@/lib/errors";
 import { parseCreateBody } from "@/lib/validate";
+import { validatePriceFilter } from "@/lib/priceFilter";
 import { handleApiError } from "@/lib/apiError";
 import { isExpenseStatus, type ExpenseStatus } from "@/lib/types";
 
@@ -19,7 +20,21 @@ export async function GET(req: Request) {
     const q = params.get("q")?.trim();
     const cursor = params.get("cursor") ?? undefined;
 
-    const result = await store.list({ status, query: q, cursor });
+    const minTotal = params.get("minTotal")?.trim() ?? "";
+    const maxTotal = params.get("maxTotal")?.trim() ?? "";
+    const priceErrors = validatePriceFilter({ minTotal, maxTotal });
+    if (priceErrors) {
+      const message = priceErrors.minTotal ?? priceErrors.maxTotal;
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    const result = await store.list({
+      status,
+      query: q,
+      minTotal: minTotal ? Number(minTotal) : undefined,
+      maxTotal: maxTotal ? Number(maxTotal) : undefined,
+      cursor,
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof InvalidExpenseCursorError) {

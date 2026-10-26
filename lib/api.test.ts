@@ -23,6 +23,24 @@ test("list serializes filters, cursor, and forwards its abort signal", async () 
   }
 });
 
+test("list serializes price filters and omits empty ones", async () => {
+  let receivedUrl = "";
+  globalThis.fetch = async (input) => {
+    receivedUrl = String(input);
+    return Response.json({ items: [] });
+  };
+
+  try {
+    await api.list({ minTotal: "10", maxTotal: "99.5" });
+    assert.equal(receivedUrl, "/api/expenses?minTotal=10&maxTotal=99.5");
+
+    await api.list({ minTotal: "", maxTotal: "" });
+    assert.equal(receivedUrl, "/api/expenses?");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("transition encodes the expense ID", async () => {
   let receivedUrl = "";
   globalThis.fetch = async (input) => {

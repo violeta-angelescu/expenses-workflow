@@ -10,7 +10,7 @@ const transition = vi.mocked(api.transition);
 
 const submitted = (overrides = {}) => expense({ id: "s1", title: "Team offsite", status: "submitted", ...overrides });
 const lastListed = (q: string, cursor?: string) =>
-  expect(list).toHaveBeenLastCalledWith({ status: "submitted", q, cursor }, expect.anything());
+  expect(list).toHaveBeenLastCalledWith({ status: "submitted", q, minTotal: "", maxTotal: "", cursor }, expect.anything());
 const reasonBox = () => screen.getByLabelText("Reason for rejection") as HTMLInputElement;
 
 describe("approval queue", () => {
@@ -20,7 +20,7 @@ describe("approval queue", () => {
 
     await screen.findByText("Team offsite");
     expect(screen.getByText("Client dinner")).toBeTruthy();
-    expect(list).toHaveBeenCalledWith({ status: "submitted", q: "", cursor: undefined }, expect.anything());
+    expect(list).toHaveBeenCalledWith({ status: "submitted", q: "", minTotal: "", maxTotal: "", cursor: undefined }, expect.anything());
     expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Reject" })).toHaveLength(2);
   });
@@ -41,6 +41,56 @@ describe("approval queue", () => {
 
     await user.click(button("Retry"));
     expect(await screen.findByText("Team offsite")).toBeTruthy();
+  });
+});
+
+describe("price filter", () => {
+  const minBox = () => screen.getByLabelText("Minimum price");
+  const maxBox = () => screen.getByLabelText("Maximum price");
+  const listedWith = (expected: object) =>
+    waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining(expected), expect.anything()));
+
+  it("refetches from the first page as the min and max price change", async () => {
+    list.mockResolvedValue(page([submitted()], "cursor-2"));
+    const { user } = renderPage(<ApprovalsPage />);
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await listedWith({ cursor: "cursor-2" });
+
+    await user.type(minBox(), "20");
+    await listedWith({ minTotal: "20", maxTotal: "", cursor: undefined });
+    await user.type(maxBox(), "50.5");
+    await listedWith({ minTotal: "20", maxTotal: "50.5" });
+  });
+
+  it("ignores characters that are not digits or a decimal point", async () => {
+    list.mockResolvedValue(page([submitted()]));
+    const { user } = renderPage(<ApprovalsPage />);
+    await screen.findByText("Team offsite");
+
+    await user.type(minBox(), "-+e1a.5.2");
+    expect((minBox() as HTMLInputElement).value).toBe("1.52");
+    await listedWith({ minTotal: "1.52" });
+  });
+
+  it("blocks a max price lower than the min price until it is fixed", async () => {
+    list.mockResolvedValue(page([submitted()]));
+    const { user } = renderPage(<ApprovalsPage />);
+    await screen.findByText("Team offsite");
+    await user.type(minBox(), "50");
+    await listedWith({ minTotal: "50" });
+    const calls = list.mock.calls.length;
+
+    await user.type(maxBox(), "10");
+    expect((await screen.findByRole("alert")).textContent).toContain("Max price cannot be lower than min price");
+    expect(maxBox().getAttribute("aria-invalid")).toBe("true");
+    expect(list.mock.calls.length).toBe(calls);
+    expect(screen.queryByText("Team offsite")).toBeNull(); // no results from a different filter
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+
+    await user.type(maxBox(), "0");
+    await listedWith({ minTotal: "50", maxTotal: "100" });
+    expect(await screen.findByText("Team offsite")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 

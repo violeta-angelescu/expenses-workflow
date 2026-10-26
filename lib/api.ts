@@ -26,10 +26,15 @@ const post = (body: unknown): RequestInit => ({
 });
 
 export const api = {
-  list: (params: { status?: ExpenseStatus; q?: string; cursor?: string } = {}, signal?: AbortSignal) => {
+  list: (
+    params: { status?: ExpenseStatus; q?: string; minTotal?: string; maxTotal?: string; cursor?: string } = {},
+    signal?: AbortSignal,
+  ) => {
     const qs = new URLSearchParams();
     if (params.status) qs.set("status", params.status);
     if (params.q) qs.set("q", params.q);
+    if (params.minTotal) qs.set("minTotal", params.minTotal);
+    if (params.maxTotal) qs.set("maxTotal", params.maxTotal);
     if (params.cursor) qs.set("cursor", params.cursor);
     return request<ExpensePage>(`/api/expenses?${qs.toString()}`, { signal });
   },

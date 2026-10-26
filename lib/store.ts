@@ -66,9 +66,13 @@ function escapeRegex(value: string) {
 }
 
 export const store = {
-  async list(filters: { status?: ExpenseStatus; query?: string; cursor?: string } = {}): Promise<ExpensePage> {
+  async list(
+    filters: { status?: ExpenseStatus; query?: string; minTotal?: number; maxTotal?: number; cursor?: string } = {},
+  ): Promise<ExpensePage> {
     const conditions: Filter<ExpenseDocument>[] = [];
     if (filters.status) conditions.push({ status: filters.status });
+    if (filters.minTotal !== undefined) conditions.push({ total: { $gte: filters.minTotal } });
+    if (filters.maxTotal !== undefined) conditions.push({ total: { $lte: filters.maxTotal } });
 
     const query = filters.query?.trim();
 
