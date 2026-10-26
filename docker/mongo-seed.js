@@ -1,4 +1,4 @@
-// Sample data for local development only.
+// Sample data for local development only. Indexes come from db/migrations (the `migrate` compose service).
 const database = db.getSiblingDB("expense_approval");
 const now = new Date();
 

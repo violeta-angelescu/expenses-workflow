@@ -136,7 +136,7 @@ test("a new expense created between page requests does not shift later pages", a
   assert.deepEqual([...first.items, ...second.items].map((e) => e.id), expectedIds(expenses));
 });
 
-test("keeps filters while paging and searches indexed text", async () => {
+test("keeps filters while paging and searches by substring", async () => {
   const statuses: ExpenseStatus[] = ["draft", "submitted", "approved", "rejected"];
   const expenses = await seed(240, 2, (i) => ({
     status: statuses[i % 4],

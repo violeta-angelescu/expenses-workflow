@@ -61,6 +61,13 @@ function decodeCursor(value: string | undefined): ExpenseCursor | undefined {
   }
 }
 
+// Substring search is an unindexed regex scan, so keep the pattern bounded.
+const MAX_QUERY_LENGTH = 100;
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export const store = {
   async list(
     filters: { status?: ExpenseStatus; query?: string; minTotal?: number; maxTotal?: number; cursor?: string } = {},
@@ -72,7 +79,10 @@ export const store = {
 
     const query = filters.query?.trim();
 
-    if (query) conditions.push({ $text: { $search: query } });
+    if (query) {
+      const pattern = new RegExp(escapeRegex(query.slice(0, MAX_QUERY_LENGTH)), "i");
+      conditions.push({ $or: [{ title: pattern }, { "lineItems.description": pattern }] });
+    }
 
     const cursor = decodeCursor(filters.cursor);
     if (cursor) {

@@ -8,7 +8,7 @@ Expense approval workflow (Next.js App Router, React 19, Tailwind v4, shadcn/ui)
 - `npm test` — runs `tsx --test lib/*.test.ts` (Node test runner). Single file: `npx tsx --test lib/expenseMachine.test.ts`. `lib/store.test.ts` needs MongoDB (`docker compose up -d mongo`) and uses a throwaway database.
 - `npm run test:components` — Vitest + Testing Library tests for the pages (`app/**/page.test.tsx`), with `@/lib/api` mocked. Shared helpers in `tests/render.tsx`.
 - `npm run test:e2e` — Playwright tests in `e2e/` against a real `next dev` (port 3100, `.next-e2e`) and MongoDB database `expense_approval_e2e`. First time: `npx playwright install chromium`.
-- `scripts/migrate-indexes.js` — idempotent mongosh script that brings an existing database's indexes up to date (needed for `$text` search). Run it before deploying; fresh volumes get the indexes from `docker/mongo-init.js`. Usage is in the script header.
+- `npm run db:migrate` — applies pending `migrate-mongo` migrations from `db/migrations/` (config in `migrate-mongo-config.js`, honours `MONGODB_URI`/`MONGODB_DB`). Also `db:migrate:status`, `db:migrate:down`, `db:migrate:create <name>`. Run it before deploying code that needs the change. `docker compose up` runs it automatically through the one-shot `migrate` service (the `app` service waits for it), so migrations are the only place indexes are defined.
 - No lint script is configured.
 
 ## Architecture

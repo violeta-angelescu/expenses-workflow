@@ -4,6 +4,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# One-shot image that applies db/migrations (used by the `migrate` service in docker-compose.yml).
+FROM dependencies AS migrator
+COPY migrate-mongo-config.js ./
+COPY db ./db
+CMD ["npx", "migrate-mongo", "up"]
+
 FROM node:22-alpine AS builder
 WORKDIR /app
 
