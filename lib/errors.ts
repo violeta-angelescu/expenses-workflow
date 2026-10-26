@@ -4,3 +4,5 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+export class InvalidExpenseCursorError extends Error {}

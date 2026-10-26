@@ -5,7 +5,9 @@ Expense approval workflow (Next.js App Router, React 19, Tailwind v4, shadcn/ui)
 ## Commands
 
 - `npm run dev` / `npm run build` / `npm start`
-- `npm test` — runs `tsx --test lib/*.test.ts` (Node test runner). Single file: `npx tsx --test lib/expenseMachine.test.ts`
+- `npm test` — runs `tsx --test lib/*.test.ts` (Node test runner). Single file: `npx tsx --test lib/expenseMachine.test.ts`. `lib/store.test.ts` needs MongoDB (`docker compose up -d mongo`) and uses a throwaway database.
+- `npm run test:components` — Vitest + Testing Library tests for the pages (`app/**/page.test.tsx`), with `@/lib/api` mocked. Shared helpers in `tests/render.tsx`.
+- `npm run test:e2e` — Playwright tests in `e2e/` against a real `next dev` (port 3100, `.next-e2e`) and MongoDB database `expense_approval_e2e`. First time: `npx playwright install chromium`.
 - No lint script is configured.
 
 ## Architecture

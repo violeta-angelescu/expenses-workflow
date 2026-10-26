@@ -1,13 +1,18 @@
 import { randomUUID } from "node:crypto";
 import type { Filter } from "mongodb";
 import { database } from "./db";
-import type { Expense, ExpenseStatus, LineItem } from "./types";
+import { InvalidExpenseCursorError } from "./errors";
+import type { Expense, ExpensePage, ExpenseStatus, LineItem } from "./types";
 
 type ExpenseDocument = Omit<Expense, "id" | "createdAt" | "updatedAt"> & {
   _id: string;
   createdAt: Date;
   updatedAt: Date;
 };
+
+type ExpenseCursor = { createdAt: string; id: string };
+
+const PAGE_SIZE = 20;
 
 const expenses = database.collection<ExpenseDocument>("expenses");
 
@@ -30,24 +35,72 @@ function toDocument(expense: Expense): ExpenseDocument {
   };
 }
 
-const LIST_LIMIT = 100;
+function encodeCursor(cursor: ExpenseCursor) {
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
+}
+
+function decodeCursor(value: string | undefined): ExpenseCursor | undefined {
+  if (!value) return undefined;
+
+  try {
+    const cursor = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as Partial<ExpenseCursor> | null;
+    const { createdAt, id } = cursor ?? {};
+
+    if (
+      typeof createdAt !== "string" ||
+      Number.isNaN(Date.parse(createdAt)) ||
+      typeof id !== "string" ||
+      !id
+    ) {
+      throw new InvalidExpenseCursorError("Invalid pagination cursor");
+    }
+
+    return { createdAt, id };
+  } catch {
+    throw new InvalidExpenseCursorError("Invalid pagination cursor");
+  }
+}
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export const store = {
-  async list(filters: { status?: ExpenseStatus; query?: string } = {}): Promise<Expense[]> {
-    const filter: Filter<ExpenseDocument> = filters.status ? { status: filters.status } : {};
+  async list(filters: { status?: ExpenseStatus; query?: string; cursor?: string } = {}): Promise<ExpensePage> {
+    const conditions: Filter<ExpenseDocument>[] = [];
+    if (filters.status) conditions.push({ status: filters.status });
+
     const query = filters.query?.trim();
 
     if (query) {
       const pattern = new RegExp(escapeRegex(query), "i");
-      filter.$or = [{ title: pattern }, { "lineItems.description": pattern }];
+      conditions.push({ $or: [{ title: pattern }, { "lineItems.description": pattern }] });
     }
 
-    const documents = await expenses.find(filter).sort({ createdAt: -1 }).limit(LIST_LIMIT).toArray();
-    return documents.map(toExpense);
+    const cursor = decodeCursor(filters.cursor);
+    if (cursor) {
+      const createdAt = new Date(cursor.createdAt);
+      conditions.push({
+        $or: [{ createdAt: { $lt: createdAt } }, { createdAt, _id: { $lt: cursor.id } }],
+      });
+    }
+
+    const filter: Filter<ExpenseDocument> = conditions.length ? { $and: conditions } : {};
+    const documents = await expenses
+      .find(filter)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(PAGE_SIZE + 1)
+      .toArray();
+    const hasNextPage = documents.length > PAGE_SIZE;
+    const page = documents.slice(0, PAGE_SIZE);
+    const last = page.at(-1);
+
+    return {
+      items: page.map(toExpense),
+      ...(hasNextPage && last
+        ? { nextCursor: encodeCursor({ createdAt: last.createdAt.toISOString(), id: last._id }) }
+        : {}),
+    };
   },
 
   async get(id: string): Promise<Expense | undefined> {

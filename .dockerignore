@@ -4,3 +4,6 @@ node_modules
 .env*
 *.tsbuildinfo
 npm-debug.log*
+.next-e2e
+playwright-report
+test-results

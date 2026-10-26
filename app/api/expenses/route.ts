@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { store } from "@/lib/store";
+import { InvalidExpenseCursorError } from "@/lib/errors";
 import { parseCreateBody } from "@/lib/validate";
 import { handleApiError } from "@/lib/apiError";
 import { isExpenseStatus, type ExpenseStatus } from "@/lib/types";
@@ -16,10 +17,14 @@ export async function GET(req: Request) {
       status = statusParam;
     }
     const q = params.get("q")?.trim();
+    const cursor = params.get("cursor") ?? undefined;
 
-    const result = await store.list({ status, query: q });
+    const result = await store.list({ status, query: q, cursor });
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof InvalidExpenseCursorError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return handleApiError(error, req);
   }
 }

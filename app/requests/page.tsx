@@ -1,6 +1,7 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { canTransition } from "@/lib/expenseMachine";
 import { ExpenseCard } from "@/components/ExpenseCard";
@@ -8,16 +9,20 @@ import { ExpenseForm, type ExpenseFormData } from "@/components/ExpenseForm";
 import { PageErrorAlert } from "@/components/PageErrorAlert";
 import { Spinner } from "@/components/Spinner";
 import { Button } from "@/components/ui/button";
+import { PaginationControls } from "@/components/PaginationControls";
 import { getClientErrorMessage } from "@/lib/clientError";
 
 const expensesKey = ["expenses"] as const;
 
 export default function RequestsPage() {
+  const [cursors, setCursors] = useState<string[]>([]);
   const queryClient = useQueryClient();
+  const cursor = cursors.at(-1);
 
   const expensesQuery = useQuery({
-    queryKey: expensesKey,
-    queryFn: ({ signal }) => api.list({}, signal),
+    queryKey: [...expensesKey, cursor],
+    queryFn: ({ signal }) => api.list({ cursor }, signal),
+    placeholderData: keepPreviousData,
   });
 
   const create = useMutation({
@@ -27,6 +32,8 @@ export default function RequestsPage() {
         items.map((item) => ({ description: item.description, amount: Number(item.amount) })),
       ),
     onSuccess: async () => {
+      // New expenses sort first, so go back to page one where the new one shows up.
+      setCursors([]);
       await queryClient.invalidateQueries({ queryKey: expensesKey });
     },
   });
@@ -95,10 +102,10 @@ export default function RequestsPage() {
 
       {expensesQuery.isPending ? (
         <Spinner />
-      ) : expensesQuery.data?.length === 0 && !error ? (
+      ) : expensesQuery.data?.items.length === 0 && !error ? (
         <div className="empty">No expenses yet. Create your first request above.</div>
       ) : (
-        expensesQuery.data?.map((expense) => (
+        expensesQuery.data?.items.map((expense) => (
           <ExpenseCard key={expense.id} expense={expense}>
             {canTransition(expense, "submit") && (
               <Button
@@ -113,6 +120,17 @@ export default function RequestsPage() {
           </ExpenseCard>
         ))
       )}
+      <PaginationControls
+        hasPrevious={cursors.length > 0}
+        hasNext={Boolean(expensesQuery.data?.nextCursor)}
+        busy={expensesQuery.isFetching}
+        onPrevious={() => setCursors((current) => current.slice(0, -1))}
+        onNext={() => {
+          if (expensesQuery.data?.nextCursor) {
+            setCursors((current) => [...current, expensesQuery.data!.nextCursor!]);
+          }
+        }}
+      />
     </>
   );
 }

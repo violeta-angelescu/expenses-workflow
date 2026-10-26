@@ -1,4 +1,4 @@
-import type { Expense, ExpenseEvent, ExpenseStatus, LineItem } from "./types";
+import type { Expense, ExpenseEvent, ExpensePage, ExpenseStatus, LineItem } from "./types";
 import { ApiError } from "./errors";
 
 const errorMessage = (data: unknown): string | undefined =>
@@ -26,11 +26,12 @@ const post = (body: unknown): RequestInit => ({
 });
 
 export const api = {
-  list: (params: { status?: ExpenseStatus; q?: string } = {}, signal?: AbortSignal) => {
+  list: (params: { status?: ExpenseStatus; q?: string; cursor?: string } = {}, signal?: AbortSignal) => {
     const qs = new URLSearchParams();
     if (params.status) qs.set("status", params.status);
     if (params.q) qs.set("q", params.q);
-    return request<Expense[]>(`/api/expenses?${qs.toString()}`, { signal });
+    if (params.cursor) qs.set("cursor", params.cursor);
+    return request<ExpensePage>(`/api/expenses?${qs.toString()}`, { signal });
   },
   create: (title: string, lineItems: LineItem[]) =>
     request<Expense>("/api/expenses", post({ title, lineItems })),

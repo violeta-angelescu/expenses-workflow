@@ -10,6 +10,7 @@ import { SearchInput } from "@/components/SearchInput";
 import { Spinner } from "@/components/Spinner";
 import { getClientErrorMessage, reportClientError } from "@/lib/clientError";
 import { Button } from "@/components/ui/button";
+import { PaginationControls } from "@/components/PaginationControls";
 
 const submittedExpensesKey = ["expenses", "submitted"] as const;
 
@@ -38,13 +39,14 @@ type Action = { id: string; event: "approve" | "reject"; text?: string };
 
 export default function ApprovalsPage() {
   const [query, setQuery] = useState("");
+  const [cursors, setCursors] = useState<string[]>([]);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const queryKey = [...submittedExpensesKey, query] as const;
 
   const expensesQuery = useQuery({
-    queryKey,
-    queryFn: ({ signal }) => api.list({ status: "submitted", q: query }, signal),
+    queryKey: [...queryKey, cursors.at(-1)],
+    queryFn: ({ signal }) => api.list({ status: "submitted", q: query, cursor: cursors.at(-1) }, signal),
     placeholderData: keepPreviousData,
   });
 
@@ -86,7 +88,13 @@ export default function ApprovalsPage() {
   return (
     <>
       <h1>Approval Queue</h1>
-      <SearchInput onSearch={setQuery} placeholder="Search by title or line item…" />
+      <SearchInput
+        onSearch={(value) => {
+          setQuery(value);
+          setCursors([]);
+        }}
+        placeholder="Search by title or line item…"
+      />
       {error && (
         <PageErrorAlert
           error={error}
@@ -96,12 +104,12 @@ export default function ApprovalsPage() {
       )}
       {expensesQuery.isPending ? (
         <Spinner />
-      ) : expensesQuery.data?.length === 0 && !error ? (
+      ) : expensesQuery.data?.items.length === 0 && !error ? (
         <div className="empty">
           {query ? `No submitted expenses match “${query}”.` : "Nothing waiting for approval."}
         </div>
       ) : (
-        expensesQuery.data?.map((expense) => (
+        expensesQuery.data?.items.map((expense) => (
           <ExpenseCard key={expense.id} expense={expense}>
             {rejectingId === expense.id ? (
               <RejectExpenseForm
@@ -120,6 +128,17 @@ export default function ApprovalsPage() {
           </ExpenseCard>
         ))
       )}
+      <PaginationControls
+        hasPrevious={cursors.length > 0}
+        hasNext={Boolean(expensesQuery.data?.nextCursor)}
+        busy={expensesQuery.isFetching}
+        onPrevious={() => setCursors((current) => current.slice(0, -1))}
+        onNext={() => {
+          if (expensesQuery.data?.nextCursor) {
+            setCursors((current) => [...current, expensesQuery.data!.nextCursor!]);
+          }
+        }}
+      />
     </>
   );
 }

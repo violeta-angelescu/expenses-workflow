@@ -23,3 +23,8 @@ export interface Expense {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ExpensePage {
+  items: Expense[];
+  nextCursor?: string;
+}

@@ -4,19 +4,19 @@ import { api } from "./api";
 
 const originalFetch = globalThis.fetch;
 
-test("list serializes filters and forwards its abort signal", async () => {
+test("list serializes filters, cursor, and forwards its abort signal", async () => {
   let receivedUrl = "";
   let receivedSignal: AbortSignal | undefined;
   globalThis.fetch = async (input, init) => {
     receivedUrl = String(input);
     receivedSignal = init?.signal ?? undefined;
-    return Response.json([]);
+    return Response.json({ items: [], nextCursor: "next" });
   };
 
   try {
     const controller = new AbortController();
-    await api.list({ status: "submitted", q: "travel costs" }, controller.signal);
-    assert.equal(receivedUrl, "/api/expenses?status=submitted&q=travel+costs");
+    await api.list({ status: "submitted", q: "travel costs", cursor: "next" }, controller.signal);
+    assert.equal(receivedUrl, "/api/expenses?status=submitted&q=travel+costs&cursor=next");
     assert.equal(receivedSignal, controller.signal);
   } finally {
     globalThis.fetch = originalFetch;
