@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { reportClientError } from "@/lib/clientError";
 import { ExpenseLineItem } from "./ExpenseLineItem";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -46,8 +47,9 @@ export function ExpenseForm({ saving = false, onCreate }: ExpenseFormProps) {
         setTitle("");
         setItems([{ ...emptyLineItem(), id: nextItemId.current++ }]);
       }
-    } catch {
-      // Consumers can report the error while keeping the draft available for retry.
+    } catch (error) {
+      // Keep the draft available for retry; consumers surface the error to the user.
+      reportClientError(error, { surface: "ExpenseForm.create" });
     }
   }
 
